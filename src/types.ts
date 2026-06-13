@@ -24,6 +24,7 @@ export interface AnalysisResponse {
     dominantColors: string[];
     detectedObjects: string[];
     vibeRating: string;
+    detectedWeather?: string;
   };
   recommendations: SongRecommendation[];
 }

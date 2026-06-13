@@ -83,12 +83,11 @@ app.post("/api/recommend-songs", async (req, res) => {
         if (style === "lofi") return textToMatch.includes("lofi") || textToMatch.includes("mộc") || textToMatch.includes("hoài niệm");
         return false;
       });
-
+      
       return matched.length > 0 ? matched[Math.floor(Math.random() * matched.length)] : PRESET_VIBES[0];
     };
 
     const ai = getAIClient();
-
     // Check if running in DEMO mode / Fallback mode
     if (!ai) {
       console.log("No GEMINI_API_KEY set or is placeholder. Using curated Vietnamese presets fallback.");
@@ -101,6 +100,7 @@ app.post("/api/recommend-songs", async (req, res) => {
           atmosphere: `${chosenPreset.atmosphere} (Demo Mode - Hãy điền GEMINI_API_KEY để cảm nhận bức ảnh thực tế nhé)`,
           dominantColors: chosenPreset.dominantColors,
           detectedObjects: chosenPreset.detectedObjects,
+          detectedWeather: "Trực giác thời tiết ấm áp mây mờ 🍃",
           vibeRating: chosenPreset.vibeRating
         },
         recommendations: chosenPreset.recommendations
@@ -111,28 +111,37 @@ app.post("/api/recommend-songs", async (req, res) => {
     const styleDescriptions: Record<string, string> = {
       all: "Mọi thể loại phong phú đang thịnh hành (ưu tiên sự phù hợp cao nhất với bức ảnh)",
       vpop: "Ưu tiên V-Pop thịnh hành nhất, trẻ trung, bắt mắt và ngập tràn tình cảm thanh xuân ngọt ngào",
-      rap: "Ưu tiên Rap và Hip-Hop Việt bụi bặm, đậm chất đường phố hoặc tự sự sâu lắng của giới Underground",
-      vinahouse: "Ưu tiên Vinahouse hoặc các bản remix (Remix / Cucak / Speed Up / Nhạc giựt giựt tưng bừng phừng phừng cực kỳ bốc)",
-      chill: "Ưu tiên Chill-out, Healing xoa dịu tâm hồn, Indie ngọt ngào mộc mạc lắng đọng",
-      lofi: "Ưu tiên âm sắc Lofi lãng đãng, êm ấm, mộc mạc chứa đầy hoài niệm xưa cũ"
+      rap: "Ưu tiên Rap và Hip-Hop Việt bụi bặm, kiểu đường phố hoặc tự sự sâu lắng của giới Underground",
+      vinahouse: "Ưu tiên Vinahouse hoặc các bản remix sôi động phập phồng nhảy nhót giật giật mạnh mẽ (Remix / Cucak / Speed Up / Nhạc giựt giựt)",
+      chill: "Ưu tiên Chill-out, Healing xoa dịu tâm hồn, Indie ngọt ngào mộc mạc lãng mạn lãng đãng",
+      lofi: "Ưu tiên âm sắc Lofi lãng đãng, êm ấm, mộc mạc chứa đầy hoài niệm xưa cũ",
+      tet: "Ưu tiên nhạc Tết cổ truyền hân hoan rộn rã, nhạc xuân tưng bừng hớn hở, mang hương vị sum vầy ấm cúng rước tài lộc cho năm mới",
+      birthday: "Ưu tiên nhạc sinh nhật vui tươi, tưng bừng giật giật rộn rã hoặc mừng tuổi mới tươi sáng đầy hy vọng, tích cực",
+      family: "Ưu tiên nhạc gia đình sum họp đầm ấm, ca khúc tình mẫu tử, tình phụ tử hay tình thân chứa chan sưởi ấm tâm hồn",
+      friends: "Ưu tiên nhạc tình bạn dạt dào thanh xuân du hí, đi phượt đi chơi vui vẻ hay những kỷ niệm thời học sinh gắn kết tri kỷ",
+      pets: "Ưu tiên nhạc dễ thương, vui tươi tinh nghịch cưng xỉu dành riêng cho thú cưng chó mèo đáng yêu làm trò",
+      mother_baby: "Ưu tiên nhạc mẹ và bé ngọt ngào, lời ru êm đềm, chứa chan tình thương trong sáng, dịu nhẹ xoa dịu búp măng non",
+      meme: "Ưu tiên nhạc chế hài hước lầy lội, nhạc remix hài bá đạo, nhạc tik tok điên rồ mang độ giải trí cực cao, vui nhộn hài hước"
     };
 
-    const styleInstruction = styleDescriptions[preferredStyle] || styleDescriptions["all"];
+    const styleInstruction = styleDescriptions[preferredStyle] || styleDescriptions.all;
 
-    // Prepare inputs
     const imagePart = {
       inlineData: {
-        mimeType: finalMimeType,
         data: cleanBase64,
+        mimeType: finalMimeType,
       },
     };
 
     const textPart = {
       text: `Hãy phân tích bức ảnh này và đề xuất từ 5-10 bài hát Việt Nam (hoặc nhạc quốc tế cực kỳ phổ biến đang làm mưa làm gió trong cộng đồng Gen Z Việt Nam) phù hợp nhất để làm nhạc Story trên mạng xã hội Facebook, Instagram, TikTok.
       
-      ⚠️ YÊU CẦU ĐẶC BIỆT VỀ PHONG CÁCH NHẠC MONG MUỐN TỪ NGƯỜI DÙNG:
+      ⚠️ YÊU CẦU ĐẶC BIỆT VỀ PHONG CÁCH NHẠC MONG WAN TỪ NGƯỜI DÙNG:
       Hệ thống đề xuất CẦN TUÂN THỦ: "${styleInstruction}".
       Hãy điều phối và chọn các bài hát thuộc phong cách định hướng này nhưng song song đó phải luôn có sự gắn kết hợp lý tối đa với cảm xúc bối cảnh trong bức ảnh của người dùng tải lên.
+
+      ⚠️ ĐẶC BIỆT: Hãy nhận diện chính xác tình trạng THỜI TIẾT và thời gian trong bức ảnh (như ngày nắng rạng rỡ, trời mưa tầm tã rơi lệ, hoàng hôn chiều tà mộng mơ, gió lạnh, mây mù âm u, hay cảnh bóng đêm, cảnh trong nhà ấm cúng không thấy rõ thời tiết...). 
+      Từ đó tích hợp cảm xúc thời tiết vào bài hát (ví dụ trời mưa thì đề xuất những bài nhạc tâm trạng rưng rưng ướt át lofi, trời nắng thì đề xuất bài nhạc sôi động, vui tươi yêu đời, hoàng hôn thì đề xuất giai điệu hoài niệm mênh mang...).
 
       Hệ thống đề xuất cần nhận biết cả các thể loại chính thống và các phạm trù văn hóa phi chính thống thường được sử dụng ở Việt Nam, ví dụ như:
       - Bản phối lại (Remix)
@@ -146,7 +155,7 @@ app.post("/api/recommend-songs", async (req, res) => {
       - Nhạc quán cà phê mộc mạc lắng đọng
 
       Tránh các đề xuất quá cũ kỹ, hãy ưu tiên các bài hát có tính lan truyền và cộng hưởng mạnh mẽ với tâm trạng bức ảnh.
-      Hãy tự quyết định góc độ nghệ thuật nào của bức ảnh là quan trọng nhất (ánh sáng, nhân vật, dáng vẻ, tone màu chủ đạo, các biểu tượng ẩn dụ nhỏ) để kết ghép giai điệu phù hợp nhất, khiến người dùng phải thốt lên kinh ngạc vì sự đồng điệu tâm hồn.`,
+      Hãy tự quyết định góc độ nghệ thuật nào của bức ảnh là quan trọng nhất (ánh sáng, nhân vật, dáng vẻ, tone màu chủ đạo, các biểu tượng ẩn dụ nhỏ) để kết ghép giai điệu phù hợp nhất, khiến người dùng phải thốt lên kinh ngạc vì sự đồng điệu tâm hồn.`
     };
 
     const response = await ai.models.generateContent({
@@ -174,6 +183,10 @@ app.post("/api/recommend-songs", async (req, res) => {
               type: Type.ARRAY,
               items: { type: Type.STRING },
               description: "Liệt kê 2-3 đối tượng chụp, bối cảnh hay yếu tố đắt giá nhất phát hiện trong ảnh."
+            },
+            detectedWeather: {
+              type: Type.STRING,
+              description: "Nhận diện tình trạng thời tiết và bối cảnh ánh sáng trong ảnh bằng một cụm từ tiếng Việt kèm icon (ví dụ: 'Ngày nắng ấm rạng rỡ ☀️', 'Trời mưa bay dào dạt 🌧️', 'Hoàng hôn buông lãng mạn 🌅', 'Ban đêm lên đèn lung linh 🌙', 'Trời mây âm u suy tư ☁️', 'Trong phòng ấm cúng 🏡')."
             },
             vibeRating: {
               type: Type.STRING,
@@ -225,7 +238,7 @@ app.post("/api/recommend-songs", async (req, res) => {
               }
             }
           },
-          required: ["atmosphere", "dominantColors", "detectedObjects", "vibeRating", "recommendations"]
+          required: ["atmosphere", "dominantColors", "detectedObjects", "detectedWeather", "vibeRating", "recommendations"]
         }
       }
     });
@@ -238,6 +251,7 @@ app.post("/api/recommend-songs", async (req, res) => {
         atmosphere: parsedJson.atmosphere || "Vibe nhẹ mơn man cuốn hút lơ đễnh.",
         dominantColors: parsedJson.dominantColors || ["#FF9E79", "#533D36", "#FAC8AF"],
         detectedObjects: parsedJson.detectedObjects || ["Phông nền tự nhiên"],
+        detectedWeather: parsedJson.detectedWeather || "Trời trong xanh tưng bừng ✨",
         vibeRating: parsedJson.vibeRating || "9.5/10 - Xứng đáng triệu tym"
       },
       recommendations: parsedJson.recommendations || []
@@ -257,6 +271,7 @@ app.post("/api/recommend-songs", async (req, res) => {
         atmosphere: `${chosenPreset.atmosphere} (Tự động đề xuất kho nhạc hot-trend do máy chủ AI đang bận)`,
         dominantColors: chosenPreset.dominantColors,
         detectedObjects: chosenPreset.detectedObjects,
+        detectedWeather: "Thời tiết ấm áp trong trẻo ☁️",
         vibeRating: chosenPreset.vibeRating
       },
       recommendations: chosenPreset.recommendations
