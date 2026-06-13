@@ -1,0 +1,8 @@
+{
+  "name": "Đề xuất Nhạc Story",
+  "description": "Ứng dụng AI đề xuất nhạc Việt Nam thịnh hành cho Story trên Instagram, Facebook và TikTok bằng cách phân tích ảnh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
