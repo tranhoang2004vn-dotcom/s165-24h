@@ -39,22 +39,36 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.2);
 }
 
-/* Base body and html background styling */
-/* Base body and html background styling */
-html {
-  scroll-behavior: smooth;
+/* Base body and html background styling with double scroll correction */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch; /* Beautiful iOS momentum scrolling effect */
-  height: 100%; /* Thêm ép chiều cao */
-  overflow: hidden; /* Khóa thanh cuộn ngoài cùng */
+  scroll-behavior: smooth;
 }
 
 body {
   background-color: #0a0510;
   color: #f5f5f4;
   font-family: var(--font-sans);
-  height: 100%; /* Thêm ép chiều cao */
-  overflow: hidden; /* Khóa thanh cuộn ngoài cùng */
-  margin: 0; /* Xóa khoảng trắng thừa nếu có */
+}
+
+/* Force only one primary scrollbar on mobile screens */
+@media (max-width: 768px) {
+  html, 
+  body, 
+  #root,
+  #app-root-wrapper {
+    overflow-y: visible !important;
+    height: auto !important;
+    min-height: 100vh !important;
+  }
 }
 
 /* High contrast custom scrollbar */
