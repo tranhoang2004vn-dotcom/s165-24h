@@ -16,6 +16,9 @@ interface SongRecommendationsListProps {
 
 // Function to resolve highly stable, public CDN preview tracks
 function getPreviewUrl(song: SongRecommendation): string {
+  if (song.previewUrl) {
+    return song.previewUrl;
+  }
   const title = (song.title || "").toLowerCase();
   const mood = (song.mood || "").toLowerCase();
   
@@ -231,19 +234,35 @@ export default function SongRecommendationsList({
                     isPlaying ? "animate-[spin_6s_linear_infinite]" : ""
                   }`}
                 >
-                  <div className="absolute inset-1.5 border border-dashed border-stone-700 rounded-full" />
-                  <Music className="w-3.5 h-3.5" style={{ color: playingTrack.accentColor }} />
-                  <div className="absolute w-2 h-2 rounded-full bg-neutral-950 border border-neutral-800" />
+                  {playingTrack.albumCoverUrl ? (
+                    <img src={playingTrack.albumCoverUrl} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                  ) : (
+                    <>
+                      <div className="absolute inset-1.5 border border-dashed border-stone-700 rounded-full" />
+                      <Music className="w-3.5 h-3.5" style={{ color: playingTrack.accentColor }} />
+                      <div className="absolute w-2 h-2 rounded-full bg-neutral-950 border border-neutral-800" />
+                    </>
+                  )}
                 </div>
                 
                 <div className="text-left overflow-hidden">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded-md bg-stone-800 text-stone-300 tracking-wider flex items-center gap-1">
                       <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? "bg-emerald-500 animate-pulse" : "bg-neutral-600"}`} />
                       PREVIEW 30s
                     </span>
                     {isLoadingAudio && (
                       <span className="text-[9px] text-amber-400 font-sans animate-pulse">Đang tải...</span>
+                    )}
+                    {playingTrack.spotifyUrl && (
+                      <a 
+                        href={playingTrack.spotifyUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-sans text-emerald-400 hover:text-emerald-300 transition-colors uppercase font-bold flex items-center gap-0.5"
+                      >
+                        ● Nghe Bản Full ↗
+                      </a>
                     )}
                   </div>
                   <h4 className="text-white font-extrabold text-sm truncate leading-snug">{playingTrack.title}</h4>
@@ -390,21 +409,27 @@ export default function SongRecommendationsList({
                   style={isSelected ? { backgroundColor: song.accentColor, borderColor: "transparent" } : undefined}
                   title={isThisTrackPlaying ? "Tạm dừng nghe thử" : "Bấm để nghe thử nhạc này"}
                 >
-                  {isThisTrackPlaying ? (
-                    <div className="relative flex items-center justify-center w-full h-full">
-                      {/* Spinning Equalizer Bars */}
-                      <div className="flex gap-0.5 items-end h-4">
-                        <div className="w-0.5 h-3 bg-stone-950 rounded-full animate-[equalizerBar_1s_ease-in-out_infinite_alternate]" />
-                        <div className="w-0.5 h-2 bg-stone-950 rounded-full animate-[equalizerBar_0.8s_ease-in-out_infinite_alternate]" style={{ animationDelay: "0.2s" }} />
-                        <div className="w-0.5 h-4.5 bg-stone-950 rounded-full animate-[equalizerBar_1.2s_ease-in-out_infinite_alternate]" style={{ animationDelay: "0.4s" }} />
-                        <div className="w-0.5 h-1.5 bg-stone-950 rounded-full animate-[equalizerBar_0.7s_ease-in-out_infinite_alternate]" style={{ animationDelay: "0.1s" }} />
-                      </div>
-                    </div>
-                  ) : isCurrentlyPlaying ? (
-                    <Play className="w-4 h-4 text-stone-950 fill-stone-950" />
-                  ) : (
-                    <Play className="w-4 h-4 text-stone-400 group-hover:text-white" />
+                  {song.albumCoverUrl && (
+                    <img src={song.albumCoverUrl} className="absolute inset-0 w-full h-full object-cover opacity-50 select-none group-hover:opacity-75 transition-opacity" referrerPolicy="no-referrer" />
                   )}
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/25 transition-all" />
+                  <div className="relative z-10 flex items-center justify-center w-full h-full">
+                    {isThisTrackPlaying ? (
+                      <div className="relative flex items-center justify-center w-full h-full">
+                        {/* Spinning Equalizer Bars */}
+                        <div className="flex gap-0.5 items-end h-4">
+                          <div className={`w-0.5 h-3 rounded-full animate-[equalizerBar_1s_ease-in-out_infinite_alternate] ${isSelected ? "bg-stone-950" : "bg-white"}`} />
+                          <div className={`w-0.5 h-2 rounded-full animate-[equalizerBar_0.8s_ease-in-out_infinite_alternate] ${isSelected ? "bg-stone-950" : "bg-white"}`} style={{ animationDelay: "0.2s" }} />
+                          <div className={`w-0.5 h-4.5 rounded-full animate-[equalizerBar_1.2s_ease-in-out_infinite_alternate] ${isSelected ? "bg-stone-950" : "bg-white"}`} style={{ animationDelay: "0.4s" }} />
+                          <div className={`w-0.5 h-1.5 rounded-full animate-[equalizerBar_0.7s_ease-in-out_infinite_alternate] ${isSelected ? "bg-stone-950" : "bg-white"}`} style={{ animationDelay: "0.1s" }} />
+                        </div>
+                      </div>
+                    ) : isCurrentlyPlaying ? (
+                      <Play className={`w-4 h-4 fill-current ${isSelected ? "text-stone-950" : "text-white"}`} />
+                    ) : (
+                      <Play className={`w-4 h-4 ${isSelected ? "text-stone-950" : "text-stone-400 group-hover:text-white"}`} />
+                    )}
+                  </div>
                 </div>
 
                 {/* Track text metadata */}

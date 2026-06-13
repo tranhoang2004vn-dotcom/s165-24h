@@ -38,6 +38,116 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+// --- SPOTIFY CLIENT CREDENTIALS FLOW & TRACK SEARCH ---
+let spotifyAccessToken = "";
+let spotifyTokenExpiry = 0; // Epoch time when token expires
+
+async function getSpotifyAccessToken(): Promise<string | null> {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret || clientId.trim() === "" || clientSecret.trim() === "" || clientId === "SPOTIFY_CLIENT_ID") {
+    console.log("Spotify API credentials not fully configured. Using fallback pre-defined audio tracks.");
+    return null;
+  }
+
+  // Use cached token if valid
+  if (spotifyAccessToken && Date.now() < spotifyTokenExpiry) {
+    return spotifyAccessToken;
+  }
+
+  try {
+    const authHeader = Buffer.from(`${clientId.trim()}:${clientSecret.trim()}`).toString("base64");
+    const response = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${authHeader}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Spotify Token Request failed (${response.status}):`, errorText);
+      return null;
+    }
+
+    const data: any = await response.json();
+    if (data.access_token) {
+      spotifyAccessToken = data.access_token;
+      // Expire token 5 minutes early (typically 3600s total duration)
+      const expiresInMs = (data.expires_in || 3600) * 1000;
+      spotifyTokenExpiry = Date.now() + expiresInMs - 300000;
+      console.log("Successfully retrieved and cached new Spotify Access Token.");
+      return spotifyAccessToken;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting Spotify access token:", error);
+    return null;
+  }
+}
+
+interface SpotifyTrackInfo {
+  previewUrl: string | null;
+  albumCoverUrl: string | null;
+  spotifyUrl: string | null;
+}
+
+async function searchSpotify(songName: string, artist: string): Promise<SpotifyTrackInfo | null> {
+  const token = await getSpotifyAccessToken();
+  if (!token) return null;
+
+  try {
+    // Sanitize Vietnamese keywords that interfere with Spotify search queries
+    const cleanSong = songName.replace(/remix|cucak|lofi|speed up|slowed|giựt|nhạc giựt/gi, "").trim();
+    const query = encodeURIComponent(`track:${cleanSong} artist:${artist}`);
+    const searchUrl = `https://api.spotify.com/v1/search?q=${query}&type=track&limit=1`;
+
+    const response = await fetch(searchUrl, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Spotify Search strict query failed for "${songName}" by "${artist}".`);
+      return null;
+    }
+
+    const data: any = await response.json();
+    let track = data.tracks?.items?.[0];
+
+    // If matching track not found with strict filter, try a broader query
+    if (!track) {
+      const simpleQuery = encodeURIComponent(`${cleanSong} ${artist}`);
+      const fallbackUrl = `https://api.spotify.com/v1/search?q=${simpleQuery}&type=track&limit=1`;
+      const fallbackResponse = await fetch(fallbackUrl, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (fallbackResponse.ok) {
+        const fallbackData: any = await fallbackResponse.json();
+        track = fallbackData.tracks?.items?.[0];
+      }
+    }
+
+    if (track) {
+      return {
+        previewUrl: track.preview_url || null,
+        albumCoverUrl: track.album?.images?.[0]?.url || null,
+        spotifyUrl: track.external_urls?.spotify || null
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error searching Spotify for "${songName}" - "${artist}":`, error);
+    return null;
+  }
+}
+
 // 1. API: Health Check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
@@ -92,6 +202,32 @@ app.post("/api/recommend-songs", async (req, res) => {
     if (!ai) {
       console.log("No GEMINI_API_KEY set or is placeholder. Using curated Vietnamese presets fallback.");
       const chosenPreset = getFallbackPresetByStyle(preferredStyle);
+      const originalRecs = chosenPreset.recommendations || [];
+
+      // Enrich with Spotify
+      const recommendations = await Promise.all(
+        originalRecs.map(async (song: any) => {
+          try {
+            const spotifyInfo = await searchSpotify(song.title, song.artist);
+            if (spotifyInfo) {
+              return {
+                ...song,
+                previewUrl: spotifyInfo.previewUrl || null,
+                albumCoverUrl: spotifyInfo.albumCoverUrl || null,
+                spotifyUrl: spotifyInfo.spotifyUrl || null
+              };
+            }
+          } catch (sErr) {
+            console.error(`Failed to lookup Spotify (Demo) for ${song.title} - ${song.artist}:`, sErr);
+          }
+          return {
+            ...song,
+            previewUrl: null,
+            albumCoverUrl: null,
+            spotifyUrl: null
+          };
+        })
+      );
       
       return res.json({
         success: true,
@@ -103,7 +239,7 @@ app.post("/api/recommend-songs", async (req, res) => {
           detectedWeather: "Trực giác thời tiết ấm áp mây mờ 🍃",
           vibeRating: chosenPreset.vibeRating
         },
-        recommendations: chosenPreset.recommendations
+        recommendations
       });
     }
 
@@ -244,6 +380,33 @@ app.post("/api/recommend-songs", async (req, res) => {
     });
 
     const parsedJson = JSON.parse(response.text || "{}");
+    const originalRecs = parsedJson.recommendations || [];
+
+    // Search Spotify in parallel to enrich the recommendations with real preview URLs
+    const recommendations = await Promise.all(
+      originalRecs.map(async (song: any) => {
+        try {
+          const spotifyInfo = await searchSpotify(song.title, song.artist);
+          if (spotifyInfo) {
+            return {
+              ...song,
+              previewUrl: spotifyInfo.previewUrl || null,
+              albumCoverUrl: spotifyInfo.albumCoverUrl || null,
+              spotifyUrl: spotifyInfo.spotifyUrl || null
+            };
+          }
+        } catch (sErr) {
+          console.error(`Failed to lookup Spotify for ${song.title} - ${song.artist}:`, sErr);
+        }
+        return {
+          ...song,
+          previewUrl: null,
+          albumCoverUrl: null,
+          spotifyUrl: null
+        };
+      })
+    );
+
     return res.json({
       success: true,
       isDemo: false,
@@ -254,7 +417,7 @@ app.post("/api/recommend-songs", async (req, res) => {
         detectedWeather: parsedJson.detectedWeather || "Trời trong xanh tưng bừng ✨",
         vibeRating: parsedJson.vibeRating || "9.5/10 - Xứng đáng triệu tym"
       },
-      recommendations: parsedJson.recommendations || []
+      recommendations
     });
 
   } catch (err: any) {
@@ -263,6 +426,31 @@ app.post("/api/recommend-songs", async (req, res) => {
     // Choose a random preset when Gemini API fails or is experiencing high demand
     const randomIndex = Math.floor(Math.random() * PRESET_VIBES.length);
     const chosenPreset = PRESET_VIBES[randomIndex];
+    const originalRecs = chosenPreset.recommendations || [];
+
+    const recommendations = await Promise.all(
+      originalRecs.map(async (song: any) => {
+        try {
+          const spotifyInfo = await searchSpotify(song.title, song.artist);
+          if (spotifyInfo) {
+            return {
+              ...song,
+              previewUrl: spotifyInfo.previewUrl || null,
+              albumCoverUrl: spotifyInfo.albumCoverUrl || null,
+              spotifyUrl: spotifyInfo.spotifyUrl || null
+            };
+          }
+        } catch (sErr) {
+          console.error(`Failed to lookup Spotify (Fallback) for ${song.title} - ${song.artist}:`, sErr);
+        }
+        return {
+          ...song,
+          previewUrl: null,
+          albumCoverUrl: null,
+          spotifyUrl: null
+        };
+      })
+    );
     
     return res.json({
       success: true,
@@ -274,7 +462,7 @@ app.post("/api/recommend-songs", async (req, res) => {
         detectedWeather: "Thời tiết ấm áp trong trẻo ☁️",
         vibeRating: chosenPreset.vibeRating
       },
-      recommendations: chosenPreset.recommendations
+      recommendations
     });
   }
 });

@@ -13,6 +13,9 @@ export interface SongRecommendation {
   accentColor: string;
   layoutStyle: "vinyl_disk" | "classic_lyrics" | "neon_wave" | "minimalist_album";
   fontStyle: "serif" | "mono" | "sans" | "display";
+  previewUrl?: string | null;
+  albumCoverUrl?: string | null;
+  spotifyUrl?: string | null;
 }
 
 export interface AnalysisResponse {
